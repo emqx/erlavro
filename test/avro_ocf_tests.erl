@@ -171,6 +171,31 @@ decoder_hook_test() ->
   {_, _, Objs} = avro_ocf:decode_binary(Bin, Options),
   ?assertEqual([[{<<"f1">>, 1}, {<<"f2">>, <<"modifiedNull">>}]], Objs).
 
+schema_roundtrip_test() ->
+  SchemaFilename = test_data("iceberg-manifest-file.avsc"),
+  {ok, JSON} = file:read_file(SchemaFilename),
+  Schema = avro:decode_schema(JSON),
+  #header{meta = MetaOut} = avro_ocf:make_header(Schema),
+  {_, SchemaJSONOut} = lists:keyfind(<<"avro.schema">>, 1, MetaOut),
+  SchemaOut = jsone:decode(SchemaJSONOut),
+  ?assertMatch(
+     #{<<"fields">> := [#{<<"field-id">> := 500} | _]},
+     SchemaOut
+    ),
+  #{<<"fields">> := FieldsOut} = SchemaOut,
+  [#{<<"type">> := [<<"null">>, Nested1]}] =
+    [F || F = #{<<"name">> := <<"partitions">>} <- FieldsOut],
+  ?assertMatch(
+     #{ <<"items">> :=
+          #{ <<"fields">> := [
+               #{<<"field-id">> := 509}
+             | _
+             ]
+           }
+      },
+     Nested1
+    ).
+
 test_data(FileName) ->
   filename:join([code:lib_dir(erlavro, test), "data", FileName]).
 

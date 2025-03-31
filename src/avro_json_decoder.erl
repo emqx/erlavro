@@ -204,20 +204,29 @@ parse_record_fields(Fields) ->
 -spec parse_record_field([{binary(), json_value()}]) ->
         record_field() | no_return().
 parse_record_field(Attrs) ->
-  Name      = avro_util:get_opt(<<"name">>,    Attrs),
-  Doc       = avro_util:get_opt(<<"doc">>,     Attrs, <<"">>),
-  Type      = avro_util:get_opt(<<"type">>,    Attrs),
-  Default   = avro_util:get_opt(<<"default">>, Attrs, undefined),
-  Order     = avro_util:get_opt(<<"order">>,   Attrs, <<"ascending">>),
-  Aliases   = avro_util:get_opt(<<"aliases">>, Attrs, []),
-  FieldType = parse_schema(Type),
+  Name        = avro_util:get_opt(<<"name">>,    Attrs),
+  Doc         = avro_util:get_opt(<<"doc">>,     Attrs, <<"">>),
+  Type        = avro_util:get_opt(<<"type">>,    Attrs),
+  Default     = avro_util:get_opt(<<"default">>, Attrs, undefined),
+  Order       = avro_util:get_opt(<<"order">>,   Attrs, <<"ascending">>),
+  Aliases     = avro_util:get_opt(<<"aliases">>, Attrs, []),
+  Keys        = [ <<"name">>
+                , <<"doc">>
+                , <<"type">>
+                , <<"default">>
+                , <<"order">>
+                , <<"aliases">>
+                ],
+  CustomAttrs = avro_util:delete_opts(Attrs, Keys),
+  FieldType   = parse_schema(Type),
   #avro_record_field
-  { name    = ?NAME(Name)
-  , doc     = Doc
-  , type    = FieldType
-  , default = Default
-  , order   = parse_order(Order)
-  , aliases = parse_aliases(Aliases)
+  { name              = ?NAME(Name)
+  , doc               = Doc
+  , type              = FieldType
+  , default           = Default
+  , order             = parse_order(Order)
+  , aliases           = parse_aliases(Aliases)
+  , custom_attributes = maps:from_list(CustomAttrs)
   }.
 
 -spec parse_order(binary()) -> ascending | descending | ignore.

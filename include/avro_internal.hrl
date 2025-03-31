@@ -35,12 +35,13 @@
 -define(NO_VALUE, undefined).
 
 -record(avro_record_field,
-        { name      = ?AVRO_REQUIRED :: name()
-        , doc       = ?NS_GLOBAL     :: typedoc()
-        , type      = ?AVRO_REQUIRED :: type_or_name()
-        , default                    :: ?NO_VALUE | avro:in() | avro_value()
-        , order     = ascending      :: ordering()
-        , aliases   = []             :: [name()]
+        { name              = ?AVRO_REQUIRED :: name()
+        , doc               = ?NS_GLOBAL     :: typedoc()
+        , type              = ?AVRO_REQUIRED :: type_or_name()
+        , default                            :: ?NO_VALUE | avro:in() | avro_value()
+        , order             = ascending      :: ordering()
+        , aliases           = []             :: [name()]
+        , custom_attributes = #{}            :: #{binary() => binary()}
         }).
 
 -type record_field() :: #avro_record_field{}.

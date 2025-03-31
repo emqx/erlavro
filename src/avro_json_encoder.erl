@@ -299,9 +299,11 @@ encode_field(Field, EnclosingNamespace, Opt) ->
                     , type    = Type
                     , default = Default
                     , order   = Order
-                    , aliases = Aliases} = Field,
+                    , aliases = Aliases
+                    , custom_attributes = CustomAttributes} = Field,
   [ {name, encode_string(Name)}
   , {type, do_encode_type(Type, EnclosingNamespace, Opt)}
+  | maps:to_list(CustomAttributes)
   ]
   ++ optional_field(default, Default, ?NO_VALUE, fun(X) -> ?INLINE(X) end)
   ++ optional_field(doc,     Doc,     ?NO_DOC,   fun encode_string/1)
