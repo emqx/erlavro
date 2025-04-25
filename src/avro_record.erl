@@ -186,9 +186,8 @@ parse_defaults(#avro_record_type{ fields = Fields
                             , default = Default
                             , name    = FieldName
                             } = Field) ->
-          FieldType = resolve_default_type(FieldType0),
           NewDefault = parse_default(FullName, FieldName,
-                                     ParseFun, FieldType, Default),
+                                     ParseFun, FieldType0, Default),
           %% go deeper
           NewFieldType = avro_util:parse_defaults(FieldType0, ParseFun),
           Field#avro_record_field{ type = NewFieldType
@@ -206,9 +205,8 @@ encode_defaults(#avro_record_type{ fields = Fields
                             , default = Default
                             , name    = FieldName
                             } = Field) ->
-          FieldType = resolve_default_type(FieldType0),
           NewDefault = encode_default(FullName, FieldName,
-                                      Lkup, FieldType, Default),
+                                      Lkup, FieldType0, Default),
           %% go deeper
           NewFieldType = avro_util:encode_defaults(FieldType0, Lkup),
           Field#avro_record_field{ type = NewFieldType
@@ -222,6 +220,8 @@ encode_defaults(#avro_record_type{ fields = Fields
 %% @private
 -spec encode_default(fullname(), name(), lkup_fun(),
                      type_or_name(), avro:in()) -> binary().
+encode_default(FullName, FieldName, Lkup, Type, Value) when ?IS_UNION_TYPE(Type) ->
+  encode_default_union(FullName, FieldName, Lkup, Type, Value);
 encode_default(FullName, FieldName, Lkup, Type, Value) ->
   F = fun(V) -> iolist_to_binary(avro_json_encoder:encode(Lkup, Type, V)) end,
   do_default(FullName, FieldName, F, Value).
@@ -229,9 +229,41 @@ encode_default(FullName, FieldName, Lkup, Type, Value) ->
 %% @private
 -spec parse_default(fullname(), name(), avro_json_decoder:default_parse_fun(),
                     type_or_name(), term()) -> avro:out().
+parse_default(FullName, FieldName, ParseFun, Type, Value) when ?IS_UNION_TYPE(Type) ->
+  parse_default_union(FullName, FieldName, ParseFun, Type, Value);
 parse_default(FullName, FieldName, ParseFun, Type, Value) ->
   DoFun = fun(V) -> ParseFun(Type, V) end,
   do_default(FullName, FieldName, DoFun, Value).
+
+parse_default_union(FullName, FieldName, ParseFun, Type, Value) when ?IS_UNION_TYPE(Type) ->
+  Types = avro_union:get_types(Type),
+  do_parse_default_union(Types, FullName, FieldName, ParseFun, Value).
+
+do_parse_default_union([Type | Types], FullName, FieldName, ParseFun, Value) ->
+  try
+    parse_default(FullName, FieldName, ParseFun, Type, Value)
+  catch
+    error:{bad_default, Context}:Stacktrace when Types == [] ->
+      %% Last type; let it raise
+      erlang:raise(error, {bad_default, Context}, Stacktrace);
+    error:{bad_default, _Context} ->
+      do_parse_default_union(Types, FullName, FieldName, ParseFun, Value)
+  end.
+
+encode_default_union(FullName, FieldName, Lkup, Type, Value) when ?IS_UNION_TYPE(Type) ->
+  Types = avro_union:get_types(Type),
+  do_encode_default_union(Types, FullName, FieldName, Lkup, Value).
+
+do_encode_default_union([Type | Types], FullName, FieldName, Lkup, Value) ->
+  try
+    encode_default(FullName, FieldName, Lkup, Type, Value)
+  catch
+    error:{bad_default, Context}:Stacktrace when Types == [] ->
+      %% Last type; let it raise
+      erlang:raise(error, {bad_default, Context}, Stacktrace);
+    error:{bad_default, _Context} ->
+      do_encode_default_union(Types, FullName, FieldName, Lkup, Value)
+  end.
 
 %% @private
 -spec do_default(fullname(), name(), function(), term()) -> any().
@@ -247,15 +279,6 @@ do_default(FullName, FieldName, DoFun, Value) ->
                 ],
       erlang:raise(error, {bad_default, Context}, Stacktrace)
   end.
-
-%% @private default value for a union type should be type checked by the
-%% first union member
-%% @end
--spec resolve_default_type(type_or_name()) -> avro_type().
-resolve_default_type(T) when ?IS_UNION_TYPE(T) ->
-  hd(avro_union:get_types(T));
-resolve_default_type(T) ->
-  T.
 
 %% @private
 -spec cast(avro_type(), input_data()) ->

@@ -69,6 +69,36 @@ default_fields_test() ->
   ?assertException(error, {unknown_field, <<"no_such_field">>},
                    get_value("no_such_field", Rec)).
 
+%% Checks that, if the field type is an union, we *do not* limit ourselves to parsing the
+%% default value only with the first type in the union.
+%% Quoting the spec:
+%%   https://avro.apache.org/docs/1.12.0/specification/#unions
+%% > Note that when a default value is specified for a record field whose type is a union,
+%%   the type of the default value must match with one element of the union.
+default_fields_union_test() ->
+  AVSCParsed = #{
+    <<"name">> => <<"myrec">>,
+    <<"type">> => <<"record">>,
+    <<"fields">> => [
+      #{ <<"name">> => <<"myfield0">>
+       , <<"type">> => [<<"null">>, <<"string">>]
+       , <<"default">> => <<"hello">>
+       }
+    ]
+  },
+  %% Should parse just fine.
+  Schema = avro:decode_schema(jsone:encode(AVSCParsed)),
+  Rec = new(Schema, []),
+  RecNull = new(Schema, [{<<"myfield0">>, null}]),
+  RecStr = new(Schema, [{<<"myfield0">>, <<"hey">>}]),
+  GetValue = fun(R) -> avro_union:get_value(get_value("myfield0", R)) end,
+  ?assertEqual(avro_primitive:string(<<"hello">>), GetValue(Rec)),
+  ?assertEqual(avro_primitive:null(), GetValue(RecNull)),
+  ?assertEqual(avro_primitive:string(<<"hey">>), GetValue(RecStr)),
+  %% Must be able to encode schema like this.
+  ?assertEqual(AVSCParsed, jsone:decode(avro:encode_schema(Schema))),
+  ok.
+
 get_set_test() ->
   Schema = type("Test", [define_field("invno", long),
                          define_field("uname", string)
