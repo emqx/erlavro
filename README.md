@@ -1,6 +1,6 @@
 Avro support for Erlang/Elixir (http://avro.apache.org/).
 
-Current version implements Apache Avro 1.8.1 specification.
+Current version implements Apache Avro 1.8.1 specification, with few exceptions (see [section](#deviations-from-spec-181) below).
 
 License: Apache License 2.0
 
@@ -260,3 +260,9 @@ back to `{Y, M, D}` --- but this is not supported so far.
 Call `avro:get_custom_props/2` to access logical type info (as well as any extra customized type properties)
 for extra data validation/transformation at application level.
 
+
+# Deviations from spec 1.8.1
+
+- We treat `default` values for an `union` type as in [spec 1.12.0](https://avro.apache.org/docs/1.12.0/specification/#unions):
+  > Note that when a default value is specified for a record field whose type is a union,
+  > the type of the default value must match with one element of the union.
